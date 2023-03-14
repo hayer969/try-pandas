@@ -65,21 +65,55 @@ columns = [
 
 # %%
 source_path = r"./test_data/full_cycle/деф по мин 10.03.23.xlsx"
+result_path = r"/home/hayer/git_projects/try-pandas/test_data/full_cycle/result.xlsx"
 source_df = pd.read_excel(
     source_path,
-    usecols=["Артикул(доп.)", "В", "Минимальная партия,ед. (В)"],
+    usecols=[
+        "Артикул(доп.)",
+        "В",
+        "Минимальная партия,ед. (В)",
+        "Остаток свободный (В)",
+        "Заказано (В)",
+        "Количество для перемещения",
+        "ОТЗ (В) на норму запаса",
+        "Остаток свободный (Из)",
+    ],
     sheet_name=2,
 )
-# %%
 source_df = source_df.rename(columns={"Артикул(доп.)": "Код"})
 source_df = source_df.set_index("Код")
 # %%
-shops = source_df.pivot(columns="В", values="Минимальная партия,ед. (В)")
+filter1 = source_df["Остаток свободный (В)"] < (
+    0.5 * source_df["Минимальная партия,ед. (В)"]
+)
+filter2 = source_df["Заказано (В)"] == 0
+filter3 = source_df["Количество для перемещения"] == 0
+filter4 = source_df["Минимальная партия,ед. (В)"] != 1
+filter5 = source_df["ОТЗ (В) на норму запаса"] != 0
+filter6 = source_df["Остаток свободный (Из)"] != 0
+filter7 = source_df["Остаток свободный (Из)"] >= source_df["Минимальная партия,ед. (В)"]
+
+filter = filter1 & filter2 & filter3 & filter4 & filter5 & filter6 & filter7
+shops = pd.DataFrame()
+shops = source_df[filter]
+# %%
+shops = shops.drop(
+    columns=[
+        "Остаток свободный (В)",
+        "Заказано (В)",
+        "Количество для перемещения",
+        "ОТЗ (В) на норму запаса",
+        "Остаток свободный (Из)",
+    ]
+)
+shops = shops.pivot(columns="В", values="Минимальная партия,ед. (В)")
+shops = shops.dropna(how="all")
+
 outcome = pd.DataFrame(columns=columns)
 outcome[shops.columns] = shops
-outcome = outcome.dropna(how="all")
 # %%
 outcome.to_clipboard(excel=True, index=True, header=True)
+outcome.to_excel(result_path, index=True, header=True)
 # %%
 final_path = r"./test_data/full_cycle/Шаблон для деф с ПРК 55.xlsx"
 final = pd.read_excel(final_path)
@@ -90,6 +124,17 @@ f2 = f2.set_index("Код")
 fff = final.copy()
 fff[fff.isnull()] = f2
 # %%
-fff2 = outcome.loc[fff.index]
+# fff2 = outcome.loc[fff.index]
+fff2 = outcome
 compare = fff2.compare(fff, align_axis=0)
+# %%
+print(set(outcome.index.tolist()) - set(fff.index.tolist()))
+# %%
+with pd.option_context(
+    "display.max_columns",
+    34,
+    "display.max_rows",
+    4,
+):
+    display(compare)
 # %%
